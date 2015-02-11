@@ -1,0 +1,26 @@
+======
+README
+WD-API docs
+======
+
+This is a short readme on how to use the internal docs of the wd-api. These are
+not consumer docs. These are dev docs so that ideas and methodologies can be
+shared with others.
+
+All changes are to be made in the 'source' directory.
+
+To learn how to use sphinx, start here:
+http://sphinx-doc.org/tutorial.html
+
+Sphinx is installed through pip so you should not have to manually install it
+into your virtualenv.
+
+Building the docs:
+------------------
+To build the docs, run this command from this directory:
+gmake html
+
+Using Autodoc:
+--------------
+For a detailed explanation of Autodoc, check here:
+http://sphinx-doc.org/ext/autodoc.html#module-sphinx.ext.autodoc
