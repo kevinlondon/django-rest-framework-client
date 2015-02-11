@@ -8,9 +8,10 @@ import requests
 from drf_client import auth, settings
 
 
-def issue_request(method, instance, params=None, data=None, ids=None):
+def issue_request(method, url, params=None, data=None, ids=None):
     """Issue the request to the API using common headers and ssl settings.
 
+    # TODO: Update docs
     Arguments:
         method (str): The HTTP method to use for the request (e.g. "post")
         instance (Resource/Collection): The model to use for url generation.
@@ -21,7 +22,7 @@ def issue_request(method, instance, params=None, data=None, ids=None):
     Returns:
         Request library response.
     """
-    url = instance.get_absolute_url()
+    #url = instance.get_absolute_url()
     if ids:
         url = "{0}/{1}".format(url, ",".join(str(pk) for pk in ids))
 
@@ -29,7 +30,7 @@ def issue_request(method, instance, params=None, data=None, ids=None):
     response = requests_call(url,
                              params=params,
                              data=json.dumps(data),
-                             headers=auth.get_headers(),
+                             #headers=auth.get_headers(),
                              verify=settings.SSL_VERIFY)
     return response
 

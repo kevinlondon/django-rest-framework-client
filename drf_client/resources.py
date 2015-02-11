@@ -5,7 +5,7 @@ drf_client SDK: Resource
 The abstract class for Resources in the drf_client System.
 All Resources (e.g., projects, assets, users) subclass from this.
 """
-
+import json
 import importlib
 import pprint
 from collections import OrderedDict
@@ -15,6 +15,34 @@ from drf_client import settings
 from drf_client.exceptions import APIException
 from drf_client.utils import convert_from_utf8, issue_request, clamp
 from drf_client.fields import Field
+
+
+def delete(path, *args, **kwargs):
+    print("Calling delete")
+    pass
+
+
+def create(path, *args, **kwargs):
+    print("Calling post on {0}".format(path))
+    return model()
+
+
+def update(path, *args, **kwargs):
+    print("Calling put on {0}".format(path))
+    pass
+
+
+def get(path, *args, **kwargs):
+    print("Calling get on {0}".format(path))
+    url = "{api}/{path}".format(api=settings.API_URL, path=path)
+    return issue_request("get", url)
+
+
+def parse(response, model):
+    """Return instances of the objects requested."""
+    body = json.loads(response.content)
+    instances = [model(data=instance_data) for instance_data in body['results']]
+    return instances
 
 
 class Collection(object):
