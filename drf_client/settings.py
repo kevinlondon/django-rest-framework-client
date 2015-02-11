@@ -1,6 +1,6 @@
-HOST = 'http://kevin:8000'
+HOST = '0.0.0.0:8000'
 VERSION = 'v2'
-API_URL = "{host}/{version}".format(host=HOST, version=VERSION)
+API_URL = "{host}".format(host=HOST)
 API_TOKEN = None  # set by wiredrive.auth.set_token()
 SSL_VERIFY = True
 
