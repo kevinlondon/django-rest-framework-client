@@ -32,7 +32,6 @@ setup(
     author_email='kevin@wiredrive.com',
     url='https://github.com/kevinlondon/django-rest-framework-client',
     packages=[
-        'drf_client'
         'drf_client',
     ],
     package_dir={'drf_client': 'drf_client'},
