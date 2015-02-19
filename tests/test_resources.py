@@ -1,10 +1,12 @@
-import mock
-from mock import patch
 import pytest
+from mock import patch
+from datetime import timedelta
+
 from drf_client.resources import Resource, Collection
 from drf_client.exceptions import APIException
 from drf_client import fields, settings
 from .helpers import mock_response
+from .fixtures import authenticate
 
 
 class ExampleResource(Resource):
@@ -31,17 +33,16 @@ def id_resource():
     return ExampleResource(id=1)
 
 
-def test_fields_embedded_on_the_resource():
-    resource = ExampleResource()
+def test_fields_embedded_on_the_resource(resource):
     res_fields = resource._declared_fields
     assert isinstance(res_fields['basic'], fields.Field)
     assert isinstance(res_fields['example_link'], fields.LinkField)
 
 
-def test_bind_fields_assigns_attr_to_resource():
+def test_bind_fields_assigns_attr_to_resource(resource):
     resource = ExampleResource()
     value = "foo"
-    with mock.patch.object(fields.Field, "__get__") as rep_mock:
+    with patch.object(fields.Field, "__get__") as rep_mock:
         rep_mock.return_value = value
         assert resource.basic == value
         assert resource.example_link == value
@@ -80,7 +81,8 @@ def test_validation_gets_called_with_args(validate_mock, resource):
 
 @patch('requests.get')
 @patch.object(Collection, '_parse_resource')
-def test_resource_fetch_data_uses_correct_ssl_setting(collection_mock, request_mock, resource):
+def test_resource_fetch_data_uses_correct_ssl_setting(
+        collection_mock, request_mock, resource, authenticate):
     for setting in (True, False):
         settings.SSL_VERIFY = setting
         resource.fetch_data()
@@ -120,7 +122,7 @@ def test_get_absolute_url_includes_id(resource):
 
 
 @patch("requests.delete")
-def test_delete_calls_api(delete_mock, resource):
+def test_delete_calls_api(delete_mock, resource, authenticate):
     delete_mock.return_value = mock_response(ok=True)
     resource.delete()
     assert delete_mock.called
@@ -129,7 +131,7 @@ def test_delete_calls_api(delete_mock, resource):
 
 
 @patch("requests.delete")
-def test_delete_raises_request_exception_on_error(delete_mock, resource):
+def test_delete_raises_request_exception_on_error(delete_mock, resource, authenticate):
     delete_mock.return_value = mock_response(ok=False)
     with pytest.raises(APIException) as err:
         resource.delete()
@@ -188,3 +190,143 @@ def test_id_resets_when_raw_data_changes():
 def test_id_does_not_cause_error_if_not_loaded():
     resource = Resource()
     assert resource.id is None
+
+
+class SimpleResource(Resource):
+    name = fields.Field()
+
+
+class ParentResource(Resource):
+    name = fields.Field()
+    brother = SimpleResource()
+    sister = SimpleResource()
+    children = SimpleResource(many=True)
+
+
+def simple_resource(id=1, name='simple'):
+    return {'id': id, 'name': name}
+
+
+@pytest.fixture
+def parent_resource_data():
+    return {'id': 1,
+            'name': 'Mother',
+            'brother': simple_resource(2, 'Bob'),
+            'sister': simple_resource(2, 'Mary'),
+            'children': [simple_resource(3, 'Jason'),
+                         simple_resource(4, 'Ken')]}
+
+
+@pytest.fixture
+def parent_resource_reload_data():
+    return {'id': 1,
+            'name': 'Father',
+            'brother': simple_resource(2, 'Marley'),
+            'sister': simple_resource(5, 'Jane'),
+            'children': [simple_resource(3, 'Jenny'),
+                         simple_resource(5, 'Stan')]}
+
+
+@pytest.fixture
+def force_reload(request):
+    # Triggers continuous reload of Resources
+    previous = Resource.DATA_EXPIRATION
+    Resource.DATA_EXPIRATION = timedelta(0)
+
+    def fix():
+        Resource.DATA_EXPIRATION = previous
+
+    request.addfinalizer(fix)
+
+
+@pytest.fixture
+def parent_resource():
+    return ParentResource(id=1)
+
+
+@patch.object(ParentResource, 'fetch_data')
+def test_resource_reloads_data_correctly(
+        fetch_mock, parent_resource_data, parent_resource_reload_data,
+        force_reload, parent_resource):
+    # First data set
+    fetch_mock.return_value = parent_resource_data
+    assert parent_resource.name == 'Mother'
+    # Second data set
+    fetch_mock.return_value = parent_resource_reload_data
+    assert parent_resource.name == 'Father'
+
+
+@patch.object(ParentResource, 'fetch_data')
+def test_resource_on_resource_reloads_data_correctly_with_same_id(
+        fetch_mock, parent_resource_data, parent_resource_reload_data,
+        force_reload, parent_resource):
+    fetch_mock.return_value = parent_resource_data
+    assert parent_resource.brother.name == 'Bob'
+    fetch_mock.return_value = parent_resource_reload_data
+    assert parent_resource.brother.name == 'Marley'
+
+
+@patch.object(ParentResource, 'fetch_data')
+def test_resource_on_resource_reloads_data_correctly_regardless_of_id(
+        fetch_mock, parent_resource_data, parent_resource_reload_data,
+        force_reload, parent_resource):
+    fetch_mock.return_value = parent_resource_data
+    assert parent_resource.sister.id == 2
+    assert parent_resource.sister.name == 'Mary'
+    fetch_mock.return_value = parent_resource_reload_data
+    # Ok if the attached value changes
+    assert parent_resource.sister.id == 5
+    assert parent_resource.sister.name == 'Jane'
+
+
+@patch.object(ParentResource, 'fetch_data')
+def test_resource_on_resource_reloads_data_correctly_when_detached(
+        fetch_mock, parent_resource_data, parent_resource_reload_data,
+        force_reload, parent_resource):
+    fetch_mock.return_value = parent_resource_data
+    # Detach Sub Resource
+    brother = parent_resource.brother
+    assert brother.name == 'Bob'
+    fetch_mock.return_value = parent_resource_reload_data
+    assert brother.name == 'Marley'
+
+
+@patch.object(ParentResource, 'fetch_data')
+def test_resource_on_resource_errors_on_reload_when_no_data_and_detached(
+        fetch_mock, parent_resource_data, parent_resource_reload_data,
+        force_reload, parent_resource):
+    fetch_mock.return_value = parent_resource_data
+    sister = parent_resource.sister
+    assert sister.name == 'Mary'
+    fetch_mock.return_value = parent_resource_reload_data
+    with pytest.raises(LookupError) as e:
+        # Should error, since resource no longer exists in parent data
+        sister.name
+    assert 'Did not find data for SimpleResource(id=2)' in str(e)
+
+
+@patch.object(ParentResource, 'fetch_data')
+def test_one_of_many_on_resource_reloads_data_correctly(
+        fetch_mock, parent_resource_data, parent_resource_reload_data,
+        force_reload, parent_resource):
+    fetch_mock.return_value = parent_resource_data
+    first_child = parent_resource.children[0]
+    assert first_child.id == 3
+    assert first_child.name == 'Jason'
+    fetch_mock.return_value = parent_resource_reload_data
+    assert first_child.id == 3
+    assert first_child.name == 'Jenny'
+
+
+@patch.object(ParentResource, 'fetch_data')
+def test_one_of_many_on_resource_errors_when_id_no_longer_exists(
+        fetch_mock, parent_resource_data, parent_resource_reload_data,
+        force_reload, parent_resource):
+    fetch_mock.return_value = parent_resource_data
+    first_child = parent_resource.children[1]
+    assert first_child.id == 4
+    assert first_child.name == 'Ken'
+    fetch_mock.return_value = parent_resource_reload_data
+    with pytest.raises(LookupError) as e:
+        first_child.name
+    assert 'Did not find data for {}'.format(str(first_child)) in str(e)

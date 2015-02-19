@@ -6,30 +6,78 @@ from dateutil.tz import tzutc
 from .helpers import RFC3339_TIME
 
 
-def test_field_binding_sets_source_if_not_set():
+@pytest.fixture
+def foo():
+    return 'foo'
+
+
+@pytest.fixture
+def bar():
+    return 'bar'
+
+
+def test_field_name_can_bet_set_on_init(foo):
+    field = fields.Field(field_name=foo)
+    assert field.field_name == foo
+
+
+def test_field_name_can_be_set_through_property(bar):
     field = fields.Field()
-    field.bind("foo", parent=None)
-    assert field.source == "foo"
+    field.field_name = bar
+    assert field.field_name == bar
 
 
-def test_field_binding_does_not_source_if_set():
-    field = fields.Field(source="bar")
-    field.bind("foo", parent=None)
-    assert field.source == "bar"
+def test_not_setting_field_name_raises_attribute_error_on_field_name():
+    field = fields.Field()
+    with pytest.raises(AttributeError):
+        field.field_name
 
 
-def test_field_binding_sets_fieldname():
-    field = fields.Field(source="bar")
-    field.bind("foo", parent=None)
-    assert field.field_name == "foo"
+def test_not_setting_field_name_raises_attribute_error_on_source():
+    field = fields.Field()
+    with pytest.raises(AttributeError):
+        field.source
 
 
-def test_link_field_strips_off_link_descriptor():
+def test_source_defaults_to_field_name_if_not_set(foo):
+    field = fields.Field()
+    field.field_name = foo
+    assert field.source == foo
+
+
+def test_setting_source_overrides_default(foo, bar):
+    field = fields.Field(field_name=foo, source=bar)
+    assert field.source == bar
+
+
+@patch.object(fields.Field, 'get_value_from_parent')
+def test_field_to_representation_calls_get_value_from_parent_correctly(get_value_mock):
+    field = fields.Field()
+    parent = Mock()
+    field.to_representation(parent)
+    get_value_mock.assert_colled_once_with(parent)
+
+
+def test_field_get_value_from_parent_calls_parent_correctly_default_source(foo):
+    field = fields.Field(source=foo)
+    parent = Mock()
+    field.get_value_from_parent(parent)
+    parent._get_field_from_raw_data.assert_called_once_with(foo, caller=field)
+
+
+def test_field_get_value_from_parent_calls_parent_correctly_overriden_source(foo, bar):
+    field = fields.Field(source=foo)
+    parent = Mock()
+    field.get_value_from_parent(parent, source=bar)
+    parent._get_field_from_raw_data.assert_called_once_with(bar, caller=field)
+
+
+@patch.object(fields.LinkField, 'get_value_from_parent', return_value={'created_by': 'foo'})
+def test_link_field_strips_off_link_descriptor(get_value_mock):
     field = fields.LinkField()
-    field.bind(field_name="created_by_link", parent=None)
-    assert field.source == "created_by_link"
-    field._get_value = Mock(return_value={"created_by": "foo"})
-    assert field.to_representation() == "foo"
+    field.field_name = 'created_by_link'
+    assert field.source == 'created_by_link'
+    assert field.to_representation(Mock()) == 'foo'
 
 
 def test_datetime_field_converts_rfc3339_to_datetime():

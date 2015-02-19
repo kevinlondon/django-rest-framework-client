@@ -13,7 +13,7 @@ def collection():
 
 @patch("requests.get")
 def test_issue_request_appends_ids_to_url(get_mock, collection, authenticate):
-    utils.issue_request("get", instance=collection, ids=[10, 2])
+    utils.issue_request("get", url=collection.get_absolute_url(), ids=[10, 2])
     called_url = get_mock.call_args[0][0]
     expected_url = "{0}/10,2".format(collection.get_absolute_url())
     assert called_url == expected_url
@@ -21,7 +21,7 @@ def test_issue_request_appends_ids_to_url(get_mock, collection, authenticate):
 
 @patch("requests.get")
 def test_issue_request_doesnt_append_if_no_ids(get_mock, collection, authenticate):
-    utils.issue_request("get", instance=collection, ids=None)
+    utils.issue_request("get", url=collection.get_absolute_url(), ids=None)
     called_url = get_mock.call_args[0][0]
     assert called_url == collection.get_absolute_url()
 
@@ -35,7 +35,7 @@ def test_converting_objs_to_ids_works_with_multiple():
 @patch("requests.get")
 def test_params_are_passed_to_request(get_mock, collection):
     params = {"foo": True}
-    utils.issue_request("get", instance=collection, params=params)
+    utils.issue_request("get", url=collection.get_absolute_url(), params=params)
     args, kwargs = get_mock.call_args
     assert kwargs["params"] == params
 

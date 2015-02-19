@@ -10,6 +10,8 @@ class Field(object):
     Tom Christie and co.'s work on Django Rest Framework.
 
     Args:
+        field_name (str): The field name on the parent instance that
+            corresponds to this Field.
         source (str): The field in the API response to use for the field.
             By default, the source winds up being equivalent to the name
             of the field on the resource.
@@ -17,41 +19,79 @@ class Field(object):
     """
     _creation_counter = 0
 
-    def __init__(self, source=None, required=False, many=False):
-        self.source = source
+    def __init__(self, field_name=None, source=None, required=False):
         self.required = required
-        self.many = many
+        self._field_name = field_name
+        self._source = source
 
-    def bind(self, field_name, parent):
-        """Sets the source for the field."""
-        self.field_name = field_name
-        self.parent = parent
-        if not self.source:
-            self.source = field_name
+    @property
+    def field_name(self):
+        if not self._field_name:
+            raise AttributeError('field_name is unset.')
+        return self._field_name
+
+    @field_name.setter
+    def field_name(self, value):
+        self._field_name = value
+
+    @property
+    def source(self):
+        if self._source:
+            return self._source
+        return self.field_name
 
     def __get__(self, instance, owner):
+        """Descriptor 'magic_method' for retrieving this Fields value.
+
+        When attached as a descriptor in a class definition:
+
+        class MyResource(Resource):
+            workflow = field.Field()
+
+        This is the method called to retrieve the value when workflow is called.
+        Fields are always assumed to be attached to a parent Resource, which
+        will correspond to the 'instance' in this methods signature. Owner
+        refers to the parent instances class, and only comes into play when
+        workflow is called on the parent Class directly.
+        """
         if instance is None:
+            # Not called through a parent instance, so return itself
             return self
 
-        return self.to_representation()
+        # Get your field value from the attached parent
+        return self.to_representation(instance)
 
-    def to_representation(self):
-        """Control how the field represents itself when called.
+    def to_representation(self, parent):
+        """Format and retrieve the representation of this object.
 
-        When overriding Field, this is the most likely candidate for change.
+        Gets the value from the attached parent and returns it. This is
+        provided as a seam for subclassing as additional processing can
+        easily be inserted.
+
+        Args:
+            parent (Resource): The parent resource to perform the data
+                lookup on.
+
+        Returns:
+            (varies): Representation of this Fields data.
         """
-        return self._get_value()
+        return self.get_value_from_parent(parent)
 
-    def _get_value(self, source=None):
+    def get_value_from_parent(self, parent, source=None, *args, **kwargs):
         """Retrieve the value from the parent's information.
 
         The parent may need to fetch data from the API if it's not stored
         locally or if it's stale.
+
+        Args:
+            parent (Resource): The parent this field is attached to.
+            source (str): Optional source field_name to useful for
+                customization in source classes
         """
         if not source:
             source = self.source
 
-        return self.parent._get_field_from_raw_data(source)
+        return parent._get_field_from_raw_data(source, caller=self)
 
     def _get_key_or_none(self, target, key):
         """Helper to return the id value or None on non required properties"""
@@ -63,8 +103,8 @@ class Field(object):
 
 class DateTimeField(Field):
 
-    def to_representation(self):
-        date = self._get_value()
+    def to_representation(self, parent):
+        date = self.get_value_from_parent(parent)
         return self.to_datetime(date)
 
     @classmethod
@@ -88,7 +128,7 @@ class DateTimeField(Field):
 
 class LinkField(Field):
 
-    def to_representation(self):
-        links = self._get_value(source="links")
+    def to_representation(self, parent):
+        links = self.get_value_from_parent(parent, source="links")
         link_key = self.source.rstrip("_link")
         return self._get_key_or_none(links, link_key)
