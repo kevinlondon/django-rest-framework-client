@@ -24,7 +24,7 @@ test_requirements = [
 ]
 
 setup(
-    name='drf_client',
+    name='djangorestclient',
     version='0.1.0',
     description="A helper library for Django Rest Framework Client Generator.",
     long_description=readme + '\n\n' + history,

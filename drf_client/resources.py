@@ -13,70 +13,14 @@ from collections import OrderedDict
 from datetime import datetime, timedelta
 from weakref import WeakKeyDictionary
 
-from drf_client import settings
-from drf_client.exceptions import APIException
-from drf_client.utils import convert_from_utf8, issue_request, clamp
-from drf_client.fields import Field
+from . import settings
+from .exceptions import APIException
+from .utils import convert_from_utf8, clamp, request
+from .fields import Field
+from .mixins import CreateMixin, GetMixin
 
 
-class Collection(object):
-
-    collection_name = ""  # override. eg: "assets", "projects"
-    resource = ""  # override. e.g. "Asset", "Project"
-
-    @property
-    def resource_class(self):
-        """Dynamically load the related resource class."""
-        if not hasattr(self, "_resource_class"):
-            module = importlib.import_module(self.__module__)
-            self._resource_class = getattr(module, self.resource)
-
-        return self._resource_class
-
-    def get_absolute_url(self):
-        return "{0}/{1}".format(settings.API_URL, self.collection_name)
-
-    def _parse_resources(self, response):
-        """Creates resource instances from the response.
-
-        Raises:
-            APIException -- If the response fails, the response is
-                badly formatted, or if the response is missing information.
-        """
-        resource_data = self._extract_resource_data(response)
-        resources = [self.resource_class(data=data) for data in resource_data]
-        if not resources:
-            msg = "No {} found in response.".format(self.collection_name)
-            raise APIException(msg, response)
-        return resources
-
-    def _parse_resource(self, response):
-        """Parse the first resource from the given response.
-
-        """
-        return self._parse_resources(response)[0]
-
-    def _extract_resource_data(self, response):
-        """Parses all of the raw resource data from the response."""
-        if not response.ok:
-            msg = "Unable to parse %s." % self.collection_name
-            raise APIException(msg, response)
-
-        body = response.json()
-        try:
-            data = body['results'][self.collection_name]
-        except KeyError:
-            msg = ('Unable to find the %s data in the response. '
-                   'The response appears malformed.' % self.collection_name)
-            raise APIException(msg, response)
-
-        return data
-
-    def create_resource(self, data):
-        self.format_data(data)
-        resource_data = self.post(data)
-        return self.resource_class(data=resource_data)
-
+class DeprecatedCollection(object):
     def format_data(self, data):
         """Shuffles around fields, if needed, to provide additional data.
 
@@ -86,65 +30,6 @@ class Collection(object):
         for key, value in data.iteritems():
             if isinstance(value, Resource):
                 data[key] = value.id
-
-    def post(self, data):
-        """Creates new resource by posting information to the API.
-
-        Returns:
-            The resource object.
-        """
-        response = issue_request("post", data=data, url=self.get_absolute_url())
-        return self._extract_resource_data(response)[0]
-
-    def get(self, limit=25, offset=0, sort="", **params):
-        """Retrieve a set of resources from the API.
-
-        Arguments:
-            limit (int): The maximum number of results to return.
-            offset (int): Specifies the starting point for resources.
-                In other words, if there's an offset of 25, it would start
-                returning the 26th resource (for example).
-            sort (str): The field in which the results should be sorted.
-                As per the API, it should be prepended with a `+` if it is
-                ascending and `-` if it's descending. If there's no sign
-                specified, it will default to `+` (ascending). If it's left
-                empty, the API will use the default sort for the resources.
-            params (kwargs): Any additional filters and expected values.
-
-        For example, if you'd like to set a different offset and
-        specify that you're looking for a resource with a `name` of "foo",
-        you would call it this way::
-
-            collection = Collection()
-            collection.get(offset=25, name="foo")
-
-        If you provide a value below 0 for `offset` or `limit`, the value
-        will be reset to 0. Similarly, if a value above the
-        MAX_PAGINATION_LIMIT setting is specified for `limit`, it will be reset
-        to the max setting.
-        """
-        if sort and sort[0] not in ("-", "+"):
-            sort = "+{}".format(sort)
-
-        params['limit'] = clamp(limit, maximum=settings.MAX_PAGINATION_LIMIT)
-        params['offset'] = clamp(offset)
-        params['sort'] = sort
-        response = issue_request("get", params=params, instance=self)
-        return self._parse_resources(response)
-
-
-class SubCollection(Collection):
-
-    def __get__(self, instance, owner):
-        if not instance:
-            return self
-
-        self.parent = instance
-        return self
-
-    def get_absolute_url(self):
-        base = self.parent.get_absolute_url()
-        return "{0}/{1}".format(base, self.collection_name)
 
 
 class ResourceMetaclass(type):
@@ -181,10 +66,10 @@ class ResourceMetaclass(type):
         return super(ResourceMetaclass, cls).__new__(cls, name, bases, attrs)
 
 
-class Resource(Field):
+class Resource(CreateMixin, GetMixin, Field):
 
     __metaclass__ = ResourceMetaclass
-    collection = Collection()  # Should be overridden by subclasses
+    _route = ""  # To be overridden by subclasses
     DATA_EXPIRATION = timedelta(minutes=2)
 
     def __init__(self, id=None, data=None, parent=None, *args, **kwargs):
@@ -270,13 +155,6 @@ class Resource(Field):
         return type(self)(data=parent_data, parent=instance,
                           field_name=self.field_name)
 
-    @classmethod
-    def create(cls, **data):
-        """Perform full validation and then have the collection create it."""
-        instance = cls()
-        instance.run_validation(data)
-        return instance.collection.create_resource(data)
-
     def _set_field_names(self):
         """Set the field_name on each field to it's label on the Resource."""
         for fieldname, fieldtype in self._declared_fields.iteritems():
@@ -334,9 +212,14 @@ class Resource(Field):
         self._last_loaded = datetime.now() if data else None
         self._data_store = convert_from_utf8(data)
 
+    @classmethod
+    def get_collection_url(cls):
+        """Return the base collection url."""
+        return "{0}/{1}".format(settings.API_URL, cls._route)
+
     def get_absolute_url(self):
         """Return the canonical API url for the resource."""
-        return "{0}/{1}".format(self.collection.get_absolute_url(), self.id)
+        return "{0}/{1}".format(self.get_collection_url(), self.id)
 
     def delete(self):
         """Removes the resource by calling the API.
@@ -344,7 +227,7 @@ class Resource(Field):
         Raises:
             RequestException: If there's a problem with the request.
         """
-        response = issue_request("delete", url=self.get_absolute_url())
+        response = request("delete", url=self.get_absolute_url())
         if not response.ok:
             raise APIException("Could not delete %s" % self, response=response)
 

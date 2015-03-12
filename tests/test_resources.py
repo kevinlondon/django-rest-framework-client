@@ -2,14 +2,17 @@ import pytest
 from mock import patch
 from datetime import timedelta
 
-from drf_client.resources import Resource, Collection
+from drf_client.resources import Resource
 from drf_client.exceptions import APIException
-from drf_client import fields, settings
+from drf_client import fields, settings, resources
 from .helpers import mock_response
 from .fixtures import authenticate
 
+ROUTE = "foo"
 
 class ExampleResource(Resource):
+    _route = ROUTE
+
     basic = fields.Field()
     example_link = fields.LinkField()
 
@@ -64,32 +67,6 @@ def test_resource_name_when_loaded_based_on_class(resource):
     assert repr(resource).startswith("ExampleResource")
 
 
-@patch.object(ExampleResource, "run_validation")
-@patch.object(ExampleResource.collection, "create_resource")
-def test_create_call_hits_validation_and_post(post_mock, validate_mock):
-    ExampleResource.create()
-    validate_mock.assert_called_with({})
-    assert post_mock.called
-
-
-@patch.object(ExampleResource, "validate")
-def test_validation_gets_called_with_args(validate_mock, resource):
-    data = {"name": "foo"}
-    resource.run_validation(data)
-    validate_mock.assert_called_with(data)
-
-
-@patch('requests.get')
-@patch.object(Collection, '_parse_resource')
-def test_resource_fetch_data_uses_correct_ssl_setting(
-        collection_mock, request_mock, resource, authenticate):
-    for setting in (True, False):
-        settings.SSL_VERIFY = setting
-        resource.fetch_data()
-        (_, called_kwargs) = request_mock.call_args
-        assert called_kwargs['verify'] == setting
-
-
 def test_setting_raw_data_updates_data_store(resource):
     example_dict = {"foo": "bar"}
     resource.raw_data = example_dict
@@ -113,8 +90,14 @@ def test_id_sets_properly_if_specified_on_creation():
     assert resource.id == 10
 
 
+def test_get_collection_url_includes_route_and_api_url():
+    actual_url = ExampleResource.get_collection_url()
+    expected_url = "{0}/{1}".format(settings.API_URL, ROUTE)
+    assert actual_url == expected_url
+
+
 def test_get_absolute_url_includes_id(resource):
-    with patch.object(resource.collection, "get_absolute_url") as collection_url:
+    with patch.object(resource, "get_collection_url") as collection_url:
         collection_url.return_value = "resource"
         resource._id = 10
         url = resource.get_absolute_url()

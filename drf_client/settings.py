@@ -11,3 +11,5 @@ MAX_PAGINATION_LIMIT = 500
 RFC3339_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 # Used for converting to and from datetimes in the fields
 DATETIME_FORMAT = RFC3339_FORMAT
+
+RESPONSE_PARSER = "drf_client.utils.ResponseParser"

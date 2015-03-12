@@ -6,30 +6,32 @@ Contains various utility classes and functions.
 import json
 import requests
 from drf_client import auth, settings
+from drf_client.exceptions import APIException
 
 
-def issue_request(method, url, params=None, data=None, ids=None):
+def request(method, url, **kwargs):
     """Issue the request to the API using common headers and ssl settings.
 
     Arguments:
         method (str): The HTTP method to use for the request (e.g. "post")
         url (str): The address for the expected resource.
+
+    Keyword Arguments:
         params (dict): Data to provide as a parameter in the URL.
         data (dict): The data to apply to the request.
-        ids (list or single int): An id or ids to add to the end of the URL.
 
     Returns:
-        Request library response.
+        Response object.
     """
-    if ids:
-        url = "{0}/{1}".format(url, ",".join(str(pk) for pk in ids))
+    try:
+        kwargs['data'] = json.dumps(kwargs['data'])
+    except KeyError:
+        # Not a big deal, just want it to be json if it's present.
+        pass
 
-    requests_call = getattr(requests, method.lower())
-    response = requests_call(url,
-                             params=params,
-                             data=json.dumps(data),
-                             #headers=auth.get_headers(),
-                             verify=settings.SSL_VERIFY)
+    request = getattr(requests, method.lower())
+    response = request(url, verify=settings.SSL_VERIFY, **kwargs)
+                      #headers=auth.get_headers(),
     return response
 
 
@@ -62,3 +64,44 @@ def convert_from_utf8(original):
         return original.encode('utf-8')
     else:
         return original
+
+
+def parse_resources(cls, response, many=True):
+    """Creates resource instances from the response.
+
+    Raises:
+        APIException -- If the response fails, the response is
+            badly formatted, or if the response is missing information.
+
+    Returns:
+        A set of instantiated resources.
+    """
+    resource_data = ResponseParser().parse(response, many=many)
+    if many:
+        return [cls(data=data) for data in resource_data]
+    else:
+        return cls(data=resource_data)
+
+
+class ResponseParser(object):
+
+    def parse(self, response, many=True):
+        if not response.ok:
+            raise APIException("Unsuccessful response", response)
+
+        body = response.json()
+        data = self.get_data(body, many=many)
+        if not data:
+            raise APIException('Unable to find results', response)
+        elif not isinstance(data, list):
+            raise APIException("Response did not return a list", response)
+        return data
+
+    def get_data(self, body, many):
+        if not many:
+            return body
+
+        try:
+            return body['results']
+        except KeyError:
+            return None
