@@ -13,23 +13,10 @@ from collections import OrderedDict
 from datetime import datetime, timedelta
 from weakref import WeakKeyDictionary
 
-from . import settings
+from . import settings, api
 from .exceptions import APIException
-from .utils import convert_from_utf8, clamp, request
+from .utils import convert_from_utf8
 from .fields import Field
-from .mixins import CreateMixin, GetMixin
-
-
-class DeprecatedCollection(object):
-    def format_data(self, data):
-        """Shuffles around fields, if needed, to provide additional data.
-
-        In addition, this will also transform resources into their primary
-        key values.
-        """
-        for key, value in data.iteritems():
-            if isinstance(value, Resource):
-                data[key] = value.id
 
 
 class ResourceMetaclass(type):
@@ -66,7 +53,7 @@ class ResourceMetaclass(type):
         return super(ResourceMetaclass, cls).__new__(cls, name, bases, attrs)
 
 
-class Resource(CreateMixin, GetMixin, Field):
+class Resource(Field):
 
     __metaclass__ = ResourceMetaclass
     _route = ""  # To be overridden by subclasses
@@ -155,6 +142,16 @@ class Resource(CreateMixin, GetMixin, Field):
         return type(self)(data=parent_data, parent=instance,
                           field_name=self.field_name)
 
+    def format_data(self, data):
+        """Shuffles around fields, if needed, to provide additional data.
+
+        In addition, this will also transform resources into their primary
+        key values.
+        """
+        for key, value in data.iteritems():
+            if isinstance(value, Resource):
+                data[key] = value.id
+
     def _set_field_names(self):
         """Set the field_name on each field to it's label on the Resource."""
         for fieldname, fieldtype in self._declared_fields.iteritems():
@@ -190,7 +187,7 @@ class Resource(CreateMixin, GetMixin, Field):
             LookupError: If the data retrieved is not for the id of this
                 Resource.
         """
-        data = self.fetch_data()
+        data = self._fetch_data()
         # Verify the data didn't change under us
         if data['id'] != self.id:
             raise LookupError('Did not find data for {}'.format(self.__str__()))
@@ -227,11 +224,11 @@ class Resource(CreateMixin, GetMixin, Field):
         Raises:
             RequestException: If there's a problem with the request.
         """
-        response = request("delete", url=self.get_absolute_url())
+        response = api.request("delete", url=self.get_absolute_url())
         if not response.ok:
             raise APIException("Could not delete %s" % self, response=response)
 
-    def fetch_data(self):
+    def _fetch_data(self):
         """GET the resource information from the API based on its primary key,
         unless the Resource has a parent resource.
 
@@ -247,7 +244,7 @@ class Resource(CreateMixin, GetMixin, Field):
             # If it has a parent instance, refer to that for it's data
             data = self.get_value_from_parent(self._parent)
         else:
-            response = issue_request("get", url=self.get_absolute_url())
+            response = api.request("get", url=self.get_absolute_url())
             data = self.collection._extract_resource_data(response)[0]
         return data
 
@@ -290,33 +287,6 @@ class Resource(CreateMixin, GetMixin, Field):
         """
         expiration = self.__class__.DATA_EXPIRATION
         return (datetime.now() - self._last_loaded) > expiration
-
-    def _extract_location_from_response_headers(self, response):
-        """Extracts the url from the location header on the response.
-
-        Confirms the response from the upload url creation was good and pulls
-        the upload url from the response headers.
-
-        Args:
-          response (requests.Response) -- Response to parse
-
-        Returns:
-          url from the location header.
-
-        Raises:
-          APIException -- If the request response indicates failure,
-            or if the resource upload url cannot be pulled from the response
-            headers.
-        """
-        if not response.ok:
-            raise APIException("Could not retrieve location header.", response)
-
-        url = response.headers.get('Location')
-        if not url:
-            msg = "No valid location found in response headers: {0}"
-            raise APIException(msg.format(response.headers), response)
-
-        return url
 
 
 class ListResource(Field):

@@ -3,7 +3,8 @@ from mock import patch
 import pytest
 import responses
 
-from drf_client import utils, resources, settings
+from drf_client import utils, settings
+from drf_client.resources import Resource
 from drf_client.exceptions import APIException
 from tests.fixtures import authenticate
 from tests.helpers import mock_response
@@ -39,13 +40,19 @@ class TestParseResource:
     def test_parse_resource_errors_on_no_assets_returned(self):
         response = mock_response(ok=True, json_value={'results': {'foo': []}})
         with pytest.raises(APIException) as e:
-            utils.parse_resources(cls=None, response=response)
+            utils.parse_resources(cls=None, response=response, many=True)
         assert 'Response did not return a list' in str(e)
 
-    @patch('requests.post')
-    def test_request_uses_expected_ssl_settings(self, request_mock):
-        for setting in (True, False):
-            settings.SSL_VERIFY = setting
-            utils.request("post", url="foo")
-            (_, called_kwargs) = request_mock.call_args
-            assert called_kwargs['verify'] == setting
+    def test_parse_resources_works_fine_when_many_is_True_and_list(self):
+        entry = {"foo": []}
+        response = mock_response(ok=True, json_value={'results': [entry, ]})
+        resources = utils.parse_resources(cls=Resource, response=response, many=True)
+        assert len(resources) == 1
+        assert resources[0].raw_data == entry
+
+    def test_parse_resource_does_not_dig_into_response_when_many_is_false(self):
+        data = {"foo": []}
+        response = mock_response(ok=True, json_value=data)
+        resource = utils.parse_resources(cls=Resource, response=response, many=False)
+        assert resource.raw_data == data
+

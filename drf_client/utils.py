@@ -5,34 +5,9 @@ Contains various utility classes and functions.
 """
 import json
 import requests
+import pydoc
 from drf_client import auth, settings
 from drf_client.exceptions import APIException
-
-
-def request(method, url, **kwargs):
-    """Issue the request to the API using common headers and ssl settings.
-
-    Arguments:
-        method (str): The HTTP method to use for the request (e.g. "post")
-        url (str): The address for the expected resource.
-
-    Keyword Arguments:
-        params (dict): Data to provide as a parameter in the URL.
-        data (dict): The data to apply to the request.
-
-    Returns:
-        Response object.
-    """
-    try:
-        kwargs['data'] = json.dumps(kwargs['data'])
-    except KeyError:
-        # Not a big deal, just want it to be json if it's present.
-        pass
-
-    request = getattr(requests, method.lower())
-    response = request(url, verify=settings.SSL_VERIFY, **kwargs)
-                      #headers=auth.get_headers(),
-    return response
 
 
 def convert_to_ids(resources):
@@ -76,7 +51,9 @@ def parse_resources(cls, response, many=True):
     Returns:
         A set of instantiated resources.
     """
-    resource_data = ResponseParser().parse(response, many=many)
+    # from http://stackoverflow.com/questions/547829
+    Parser = pydoc.locate(settings.RESPONSE_PARSER)
+    resource_data = Parser().parse(response, many=many)
     if many:
         return [cls(data=data) for data in resource_data]
     else:
@@ -93,7 +70,7 @@ class ResponseParser(object):
         data = self.get_data(body, many=many)
         if not data:
             raise APIException('Unable to find results', response)
-        elif not isinstance(data, list):
+        elif many and not isinstance(data, list):
             raise APIException("Response did not return a list", response)
         return data
 
