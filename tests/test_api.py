@@ -5,16 +5,6 @@ from mock import patch, Mock
 from drf_client import utils, api, settings
 from drf_client.exceptions import APIException
 from drf_client.resources import Resource
-from drf_client.mixins import GetMixin, CreateMixin
-
-
-class TestResource(CreateMixin, GetMixin, Resource):
-    pass
-
-
-@pytest.fixture
-def resource():
-    return TestResource()
 
 
 class TestGet:
@@ -23,7 +13,7 @@ class TestGet:
     @patch.object(api, "request")
     def _get_arguments_to_request(self, request_mock, parse_mock, **kwargs):
         """Return a tuple of (args, kwargs)."""
-        TestResource.get(**kwargs)
+        api.get(cls=Resource, **kwargs)
         assert request_mock.called
         return request_mock.call_args
 
@@ -64,31 +54,30 @@ class TestGet:
     @patch.object(utils, "parse_resources", return_value="foo")
     @patch.object(api, "request", return_value="baz")
     def test_get_calls_issue_request_and_parse(self, request_mock, parse_mock):
-        GetMixin._route = Mock()
-        GetMixin.get_collection_url = Mock()
-        assert GetMixin.get() == "foo"
+        Resource._route = Mock()
+        assert api.get(cls=Resource) == "foo"
         assert request_mock.called
-        parse_mock.assert_called_once_with(GetMixin, "baz")
+        parse_mock.assert_called_once_with(Resource, "baz")
 
 
 class TestCreate:
 
     def _create_resource_and_ignore_errors(self, **data):
         try:
-            TestResource.create(**data)
+            api.create(cls=Resource, **data)
         except APIException:
             # Doesn't matter, ignore it.
             pass
 
     @patch("drf_client.api.request")
-    @patch.object(TestResource, "run_validation")
+    @patch.object(Resource, "run_validation")
     def test_calls_validation_on_model(self, validation_mock, request_mock):
         data = {"foo": "bar"}
         self._create_resource_and_ignore_errors(**data)
         validation_mock.assert_called_with(data)
 
     @patch("drf_client.api.request")
-    @patch.object(TestResource, "get_collection_url", return_value="http://")
+    @patch.object(Resource, "get_collection_url", return_value="http://")
     def test_calls_request_with_post_and_collection_url(self, url_mock, request_mock):
         data = {"foo": "bar"}
         self._create_resource_and_ignore_errors(**data)
@@ -98,7 +87,8 @@ class TestCreate:
 class TestRequestMethod:
 
     @patch("requests.get")
-    def test_params_are_passed_to_request(self, get_mock, resource):
+    def test_params_are_passed_to_request(self, get_mock):
+        resource = Resource()
         params = {"foo": True}
         api.request("get", url=resource.get_absolute_url(), params=params)
         args, kwargs = get_mock.call_args
