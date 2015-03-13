@@ -1,5 +1,4 @@
 import pytest
-import responses
 from mock import patch, Mock
 
 from drf_client import utils, api, settings
