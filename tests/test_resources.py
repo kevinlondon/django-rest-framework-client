@@ -13,7 +13,6 @@ class ExampleResource(Resource):
     _route = "foo"
 
     basic = fields.Field()
-    example_link = fields.LinkField()
 
 
 class ChildExampleResource(ExampleResource):
@@ -22,7 +21,6 @@ class ChildExampleResource(ExampleResource):
 
 class DifferentResource(Resource):
     basic = fields.Field()
-    example_link = fields.LinkField()
 
 
 @pytest.fixture
@@ -38,7 +36,6 @@ def id_resource():
 def test_fields_embedded_on_the_resource(resource):
     res_fields = resource._declared_fields
     assert isinstance(res_fields['basic'], fields.Field)
-    assert isinstance(res_fields['example_link'], fields.LinkField)
 
 
 def test_bind_fields_assigns_attr_to_resource(resource):
@@ -47,7 +44,6 @@ def test_bind_fields_assigns_attr_to_resource(resource):
     with patch.object(fields.Field, "__get__") as rep_mock:
         rep_mock.return_value = value
         assert resource.basic == value
-        assert resource.example_link == value
 
 
 def test_resource_name_sets_name_based_on_class(resource):

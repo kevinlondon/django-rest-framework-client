@@ -124,11 +124,3 @@ class DateTimeField(Field):
             raise TypeError(msg.format(dt_format=settings.DATETIME_FORMAT))
 
         return dt
-
-
-class LinkField(Field):
-
-    def to_representation(self, parent):
-        links = self.get_value_from_parent(parent, source="links")
-        link_key = self.source.rstrip("_link")
-        return self._get_key_or_none(links, link_key)

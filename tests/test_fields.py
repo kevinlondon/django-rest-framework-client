@@ -72,14 +72,6 @@ def test_field_get_value_from_parent_calls_parent_correctly_overriden_source(foo
     parent._get_field_from_raw_data.assert_called_once_with(bar, caller=field)
 
 
-@patch.object(fields.LinkField, 'get_value_from_parent', return_value={'created_by': 'foo'})
-def test_link_field_strips_off_link_descriptor(get_value_mock):
-    field = fields.LinkField()
-    field.field_name = 'created_by_link'
-    assert field.source == 'created_by_link'
-    assert field.to_representation(Mock()) == 'foo'
-
-
 def test_datetime_field_converts_rfc3339_to_datetime():
     field = fields.DateTimeField()
     converted_dt = field.to_datetime(RFC3339_TIME)
