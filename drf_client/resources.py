@@ -60,7 +60,7 @@ class Resource(Field):
     DATA_EXPIRATION = timedelta(minutes=2)
 
     def __init__(self, id=None, data=None, parent=None, *args, **kwargs):
-        """Instantiates a drf_client resource.
+        """Instantiates a Django Rest Framework resource.
 
         The resource performs deferred loading, so no data
         will be actually be loaded until a property on the object is

@@ -26,7 +26,7 @@ class TestGet:
 
     def test_get_sets_limit_param(self):
         params = self._get_params()
-        assert params['limit'] == 25
+        assert params['limit'] == settings.MAX_PAGINATION_LIMIT
 
     def test_get_sets_offset_param(self):
         params = self._get_params()

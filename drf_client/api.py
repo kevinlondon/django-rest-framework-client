@@ -30,10 +30,11 @@ def request(method, url, **kwargs):
     return response
 
 
-def get(cls, limit=25, offset=0, sort="", **params):
+def get(cls, limit=settings.MAX_PAGINATION_LIMIT, offset=0, sort="", **params):
     """Retrieve a set of resources from the API.
 
     Arguments:
+        cls (Resource class): The resource type to retrieve
         limit (int): The maximum number of results to return.
         offset (int): Specifies the starting point for resources.
             In other words, if there's an offset of 25, it would start
@@ -41,11 +42,17 @@ def get(cls, limit=25, offset=0, sort="", **params):
         params (kwargs): Any additional filters and expected values.
 
     For example, if you'd like to set a different offset and
-    specify that you're looking for a resource with a `name` of "foo",
-    you would call it this way::
+    specify that you're looking for a resource with a `class` of "Foo",
+    you would call it directly this way::
 
-        collection = Collection()
-        collection.get(offset=25, name="foo")
+        get(Foo, offset=25, name="foo")
+
+    Alternatively, it's likely that there's an API method already set up
+    for the resource you're trying to use. In which case,
+    for the above example, you could use::
+
+        import foos
+        foos.get(name="Bar", offset=25)
 
     If you provide a value below 0 for `offset` or `limit`, the value
     will be reset to 0. Similarly, if a value above the
@@ -59,6 +66,19 @@ def get(cls, limit=25, offset=0, sort="", **params):
 
 
 def create(cls, **data):
+    """Create a single instance of a Resource.
+
+    Arguments:
+        cls (Resource class): The resource to create.
+
+    All other keyword arguments will be provided to the request
+    when POSTing. For example::
+
+        create(Foo, name="bar", email="baz@foo.com")
+
+    ...would try to create an instance of the Foo resource
+    with a name set to "bar" and an email set to "baz@foo.com".
+    """
     instance = cls()
     instance.run_validation(data)
     response = request("post", url=cls.get_collection_url(), data=data)
