@@ -1,8 +1,6 @@
 import json
 import requests
-from importlib import import_module
 from drf_client import settings, utils
-from drf_client.exceptions import APIException
 
 
 def request(method, url, **kwargs):
@@ -26,11 +24,11 @@ def request(method, url, **kwargs):
         pass
 
     request = getattr(requests, method.lower())
-    response = request(url, verify=settings.SSL_VERIFY, **kwargs)
+    response = request(url, verify=settings.VERIFY_SSL, **kwargs)
     return response
 
 
-def get(cls, limit=settings.MAX_PAGINATION_LIMIT, offset=0, sort="", **params):
+def get(cls, limit=settings.MAX_PAGINATION, offset=0, sort="", **params):
     """Retrieve a set of resources from the API.
 
     Arguments:
@@ -56,10 +54,10 @@ def get(cls, limit=settings.MAX_PAGINATION_LIMIT, offset=0, sort="", **params):
 
     If you provide a value below 0 for `offset` or `limit`, the value
     will be reset to 0. Similarly, if a value above the
-    MAX_PAGINATION_LIMIT setting is specified for `limit`, it will be reset
+    MAX_PAGINATION setting is specified for `limit`, it will be reset
     to the max setting.
     """
-    params['limit'] = utils.clamp(limit, maximum=settings.MAX_PAGINATION_LIMIT)
+    params['limit'] = utils.clamp(limit, maximum=settings.MAX_PAGINATION)
     params['offset'] = utils.clamp(offset)
     response = request("get", params=params, url=cls.get_collection_url())
     return utils.parse_resources(cls, response)

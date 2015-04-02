@@ -26,7 +26,7 @@ class TestGet:
 
     def test_get_sets_limit_param(self):
         params = self._get_params()
-        assert params['limit'] == settings.MAX_PAGINATION_LIMIT
+        assert params['limit'] == settings.MAX_PAGINATION
 
     def test_get_sets_offset_param(self):
         params = self._get_params()
@@ -38,8 +38,8 @@ class TestGet:
         assert params['limit'] == new_limit
 
     def test_cannot_set_limit_higher_than_500(self):
-        params = self._get_params(limit=settings.MAX_PAGINATION_LIMIT+10)
-        assert params['limit'] == settings.MAX_PAGINATION_LIMIT
+        params = self._get_params(limit=settings.MAX_PAGINATION+10)
+        assert params['limit'] == settings.MAX_PAGINATION
 
     def test_cannot_set_limit_or_offset_below_0(self):
         params = self._get_params(limit=-5, offset=-5)
@@ -98,13 +98,13 @@ class TestRequestMethod:
         method = "get"
         url = "foo"
         api.request(method, url)
-        get_mock.assert_called_once_with(url, verify=settings.SSL_VERIFY)
+        get_mock.assert_called_once_with(url, verify=settings.VERIFY_SSL)
 
 
 @patch('requests.post')
 def test_request_uses_expected_ssl_settings(request_mock):
     for setting in (True, False):
-        settings.SSL_VERIFY = setting
+        settings.VERIFY_SSL = setting
         api.request("post", url="foo")
         (_, called_kwargs) = request_mock.call_args
         assert called_kwargs['verify'] == setting

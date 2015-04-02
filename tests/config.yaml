@@ -1,0 +1,5 @@
+HOST: 'localhost:8000'
+USE_HTTPS: false
+VERIFY_SSL: false
+MAX_PAGINATION: 500
+RESPONSE_PARSER: 'drf_client.utils.ResponseParser'
