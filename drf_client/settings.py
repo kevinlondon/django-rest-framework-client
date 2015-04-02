@@ -6,6 +6,7 @@ VERIFY_SSL = True
 API_URL = "http://{host}".format(host=HOST)
 
 MAX_PAGINATION = 500
+
 RFC3339_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 DATETIME_FORMAT = RFC3339_FORMAT
 

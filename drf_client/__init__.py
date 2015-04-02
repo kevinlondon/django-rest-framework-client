@@ -5,14 +5,26 @@ __email__ = 'kevin@wiredrive.com'
 __version__ = '0.1.0'
 
 
-def configure(filepath=None):
+def configure(filepath=None, username=None, password=None, token=None):
     import yaml
+    from . import settings
+
     with open(filepath, 'r') as config_file:
         config = yaml.load(config_file)
 
-    from . import settings
     for key, value in config.items():
         setattr(settings, key, value)
 
     scheme = "https" if settings.USE_HTTPS else "http"
     settings.API_URL = "{0}://{1}".format(scheme, settings.HOST)
+    authenticate(username, password, token)
+
+
+def authenticate(username, password, token):
+    from . import auth
+    if username:
+        auth.log_in(username=username, password=password)
+    elif token:
+        auth.set_token(token=token)
+    else:
+        raise ValueError("No authentication provided to configuration.")
