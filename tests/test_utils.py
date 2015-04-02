@@ -55,4 +55,3 @@ class TestParseResource:
         response = mock_response(ok=True, json_value=data)
         resource = utils.parse_resources(cls=Resource, response=response, many=False)
         assert resource.raw_data == data
-

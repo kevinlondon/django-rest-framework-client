@@ -1,3 +1,5 @@
+from drf_client.auth import AuthenticationBase
+
 HOST = '0.0.0.0:8000'
 USE_HTTPS = False
 VERIFY_SSL = True
@@ -9,5 +11,4 @@ DATETIME_FORMAT = RFC3339_FORMAT
 
 RESPONSE_PARSER = "drf_client.utils.ResponseParser"
 
-from drf_client.auth import AuthenticationBase
 AUTHENTICATION = AuthenticationBase()  # set by drf_client.auth
