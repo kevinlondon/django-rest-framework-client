@@ -27,8 +27,7 @@ class AuthenticationBase(object):
         try:
             auth = "{0} {1}".format(self.prefix, self.authentication)
         except AttributeError:
-            raise ValueError("Authentication incorrectly configured. "
-                             "Please see documentation for how to set it up.")
+            return {}
 
         return {"Authorization": auth}
 

@@ -22,9 +22,12 @@ def configure(filepath=None, username=None, password=None, token=None):
 
 def authenticate(username, password, token):
     from . import auth
+    import logging
+    logger = logging.getLogger(__name__)
+
     if username:
         auth.log_in(username=username, password=password)
     elif token:
         auth.set_token(token=token)
     else:
-        raise ValueError("No authentication provided to configuration.")
+        logger.warning("No authentication provided to configuration.")

@@ -24,7 +24,10 @@ def request(method, url, **kwargs):
         pass
 
     request = getattr(requests, method.lower())
-    response = request(url, verify=settings.VERIFY_SSL, **kwargs)
+    headers = {"Content-Type": "application/json"}
+    headers.update(settings.AUTHENTICATION.get_header())
+    response = request(url, headers=headers,
+                       verify=settings.VERIFY_SSL, **kwargs)
     return response
 
 
